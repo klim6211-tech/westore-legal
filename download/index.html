@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>위스토어 설치 (안드로이드)</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    margin: 0;
+    background: #F2F4F6;
+    color: #191F28;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 40px 22px 80px;
+  }
+  .hero {
+    background: linear-gradient(135deg, #1F9670 0%, #0E6E54 100%);
+    border-radius: 24px;
+    padding: 36px 28px 32px;
+    color: #fff;
+    text-align: center;
+    box-shadow: 0 12px 30px rgba(14,110,84,0.28);
+  }
+  .logo {
+    width: 72px; height: 72px;
+    border-radius: 18px;
+    background: rgba(255,255,255,0.16);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 18px;
+    font-size: 34px; font-weight: 800; letter-spacing: -1px;
+  }
+  .hero h1 { font-size: 23px; font-weight: 800; margin: 0 0 6px; letter-spacing: -0.5px; }
+  .hero p { font-size: 14px; margin: 0; opacity: 0.9; }
+  .btn {
+    display: block;
+    margin: 26px 0 0;
+    background: #fff;
+    color: #0E6E54;
+    text-decoration: none;
+    text-align: center;
+    font-size: 17px;
+    font-weight: 800;
+    padding: 17px;
+    border-radius: 15px;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+  }
+  .btn:active { transform: translateY(1px); }
+  .ver { text-align: center; font-size: 12px; color: #8B95A1; margin-top: 12px; }
+  .card {
+    background: #fff;
+    border-radius: 18px;
+    padding: 24px 22px;
+    margin-top: 20px;
+  }
+  .card h2 { font-size: 15px; font-weight: 800; margin: 0 0 16px; color: #333D4B; }
+  .step { display: flex; gap: 13px; margin-bottom: 15px; }
+  .step:last-child { margin-bottom: 0; }
+  .num {
+    flex: 0 0 24px; width: 24px; height: 24px;
+    background: #E8F5F0; color: #0E6E54;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 800;
+  }
+  .step div.t { font-size: 14.5px; color: #333D4B; }
+  .step .t b { color: #191F28; }
+  .qr { text-align: center; margin-top: 20px; }
+  .qr img { width: 150px; height: 150px; border-radius: 12px; background:#fff; padding:8px; border:1px solid #EAEDF0; }
+  .qr p { font-size: 12px; color: #8B95A1; margin: 10px 0 0; }
+  .foot { text-align: center; font-size: 12px; color: #B0B8C1; margin-top: 28px; line-height: 1.7; }
+  .foot a { color: #8B95A1; }
+  .ios {
+    margin-top: 20px; text-align:center; font-size: 13px; color:#6B7684;
+    background:#fff; border-radius:14px; padding:16px;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <div class="logo">W</div>
+      <h1>위스토어 설치</h1>
+      <p>안드로이드 · 최신 버전</p>
+      <a class="btn" href="westore.apk" download>앱 다운로드</a>
+      <div class="ver">버튼을 누르면 최신 설치 파일을 내려받습니다</div>
+    </div>
+
+    <div class="card">
+      <h2>설치 방법</h2>
+      <div class="step"><div class="num">1</div><div class="t"><b>앱 다운로드</b>를 누릅니다.</div></div>
+      <div class="step"><div class="num">2</div><div class="t">다운로드가 끝나면 <b>파일을 엽니다</b>.</div></div>
+      <div class="step"><div class="num">3</div><div class="t">"출처를 알 수 없는 앱" 안내가 뜨면 <b>허용</b>을 눌러주세요. (한 번만)</div></div>
+      <div class="step"><div class="num">4</div><div class="t"><b>설치</b>를 누르면 끝. 이미 앱이 있어도 <b>지우지 말고</b> 그 위에 그대로 설치하면 됩니다. 로그인·데이터는 유지됩니다.</div></div>
+    </div>
+
+    <div class="qr">
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=https://klim6211-tech.github.io/westore-legal/download/" alt="설치 페이지 QR">
+      <p>다른 사람에게 이 페이지를 공유할 때 스캔하세요</p>
+    </div>
+
+    <div class="ios">
+      아이폰(iOS)은 <b>TestFlight</b>로 설치합니다. 초대 링크는 관리자에게 문의하세요.
+    </div>
+
+    <div class="foot">
+      위스토어는 도입 매장의 사장님·직원을 위한 업무용 앱입니다.<br>
+      <a href="../">개인정보처리방침 · 이용약관</a>
+    </div>
+  </div>
+</body>
+</html>
