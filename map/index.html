@@ -90,6 +90,28 @@
 (function () {
   'use strict';
 
+  /**
+   * ⚠️ 카카오 SDK가 안 뜨면 **여기서 멈추고 이유를 말한다** (2026-08-17).
+   *
+   * 원래는 아래에서 바로 new kakao.maps.Map(...)을 불렀다. SDK가 도메인
+   * 검사에 막히면(401) kakao가 undefined라 그 줄에서 조용히 죽고, 화면은
+   * 처음 문구인 "위치를 찾는 중…" 그대로 남았다. 사용자는 영원히 기다린다.
+   * 실제로 커스텀 도메인을 붙였다가 이 증상을 겪었다.
+   */
+  if (typeof kakao === 'undefined' || !kakao.maps) {
+    document.getElementById('addr').textContent = '지도를 불러오지 못했어요';
+    document.getElementById('addrSub').textContent =
+      '이 주소(' + location.hostname + ')가 지도 서비스에 등록되지 않았어요.';
+    document.getElementById('confirm').textContent = '닫기';
+    document.getElementById('confirm').disabled = false;
+    document.getElementById('confirm').addEventListener('click', function () {
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'close' }));
+      }
+    });
+    return;
+  }
+
   function qs(name, fallback) {
     var m = new RegExp('[?&]' + name + '=([^&]*)').exec(location.search);
     return m ? decodeURIComponent(m[1]) : fallback;
