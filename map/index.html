@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>위치 선택</title>
+<!--
+  위스토어 "주변 신규/폐업" 위치 선택 지도 (2026-08-17).
+
+  왜 웹페이지인가:
+    앱에 네이티브 지도 라이브러리(react-native-maps)를 넣으면 새 빌드가 필요하고
+    직원 전원이 앱을 다시 받아야 한다. 앱에 이미 들어 있는 WebView로 이 페이지를
+    띄우면 무선 업데이트만으로 지도가 들어간다.
+
+  왜 GitHub Pages인가:
+    카카오는 JavaScript 키를 쓰는 "도메인"을 검사한다. 앱 안에서 만든 HTML은
+    도메인이 없어 거부당한다. 우리가 소유한 https 도메인에 올려두고 그 주소를
+    카카오에 등록해두면 확실히 통과한다.
+    등록 도메인: https://klim6211-tech.github.io
+    (2026-08-17 실측: 이 도메인 → 200 / example.com → 401 domain mismatched)
+
+  JavaScript 키가 소스에 그대로 있는 건 정상이다. 카카오 JS 키는 원래 공개되는
+  값이고, 위의 도메인 등록이 보안 장치 역할을 한다.
+-->
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=814a36d964b05a41864fe87652897e4a&libraries=services"></script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Noto Sans KR',sans-serif; }
+  #map { position:absolute; inset:0; }
+
+  /* 가운데 고정 핀 — 지도를 움직여서 위치를 고른다.
+     핀을 끄는 방식보다 한 손으로 쓰기 쉽고, 손가락에 핀이 가려지지 않는다. */
+  #pin { position:absolute; left:50%; top:50%; width:34px; height:46px;
+    transform:translate(-50%,-100%); pointer-events:none; z-index:5;
+    transition:transform .12s ease-out; }
+  #pin.lift { transform:translate(-50%,-100%) translateY(-8px); }
+  #pinShadow { position:absolute; left:50%; top:50%; width:16px; height:6px;
+    transform:translate(-50%,-50%); background:rgba(0,0,0,.28); border-radius:50%;
+    filter:blur(2px); pointer-events:none; z-index:4; }
+
+  /* 반경 안내 칩 */
+  #radiusChip { position:absolute; top:12px; left:50%; transform:translateX(-50%);
+    background:rgba(25,31,40,.82); color:#fff; font-size:13px; font-weight:600;
+    padding:7px 14px; border-radius:999px; z-index:6; white-space:nowrap; }
+
+  /* 하단 카드 */
+  #sheet { position:absolute; left:0; right:0; bottom:0; z-index:7;
+    background:#fff; border-radius:18px 18px 0 0; padding:16px 16px calc(16px + env(safe-area-inset-bottom));
+    box-shadow:0 -6px 24px rgba(23,43,64,.14); }
+  #addr { font-size:16px; font-weight:700; color:#191F28; line-height:1.35;
+    margin-bottom:4px; word-break:keep-all; }
+  #addrSub { font-size:13px; color:#8B95A1; margin-bottom:14px; }
+  #confirm { width:100%; height:50px; border:0; border-radius:12px;
+    background:#0E8E6D; color:#fff; font-size:16px; font-weight:700; }
+  #confirm:active { transform:scale(.985); }
+  #confirm:disabled { background:#C6D0DA; }
+
+  /* 내 위치 버튼 */
+  #locBtn { position:absolute; right:14px; z-index:6; width:44px; height:44px;
+    border-radius:22px; background:#fff; border:0;
+    box-shadow:0 3px 10px rgba(23,43,64,.2); display:flex; align-items:center;
+    justify-content:center; }
+  #locBtn svg { width:22px; height:22px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="pinShadow"></div>
+<svg id="pin" viewBox="0 0 34 46" fill="none">
+  <path d="M17 45C17 45 32 27.5 32 16.5C32 8.2 25.3 1.5 17 1.5C8.7 1.5 2 8.2 2 16.5C2 27.5 17 45 17 45Z"
+        fill="#0E8E6D" stroke="#fff" stroke-width="2.5"/>
+  <circle cx="17" cy="16.5" r="5.5" fill="#fff"/>
+</svg>
+<div id="radiusChip">반경 500m</div>
+<button id="locBtn" aria-label="내 위치로">
+  <svg viewBox="0 0 24 24" fill="none" stroke="#0E8E6D" stroke-width="2" stroke-linecap="round">
+    <circle cx="12" cy="12" r="7"/><path d="M12 1v3M12 20v3M23 12h-3M4 12H1"/>
+    <circle cx="12" cy="12" r="2.5" fill="#0E8E6D" stroke="none"/>
+  </svg>
+</button>
+
+<div id="sheet">
+  <div id="addr">위치를 찾는 중…</div>
+  <div id="addrSub">지도를 움직여 위치를 정하세요</div>
+  <button id="confirm" disabled>이 위치로 보기</button>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  function qs(name, fallback) {
+    var m = new RegExp('[?&]' + name + '=([^&]*)').exec(location.search);
+    return m ? decodeURIComponent(m[1]) : fallback;
+  }
+
+  var startLat = parseFloat(qs('lat', '37.4444904832658'));
+  var startLng = parseFloat(qs('lng', '126.70368534104'));
+  var radius = parseInt(qs('radius', '500'), 10);
+
+  var mapEl = document.getElementById('map');
+  var addrEl = document.getElementById('addr');
+  var addrSubEl = document.getElementById('addrSub');
+  var confirmEl = document.getElementById('confirm');
+  var pinEl = document.getElementById('pin');
+  var chipEl = document.getElementById('radiusChip');
+  var locBtn = document.getElementById('locBtn');
+  var sheetEl = document.getElementById('sheet');
+
+  // 하단 카드에 가리지 않게 '내 위치' 버튼을 카드 위로 띄운다.
+  function placeLocBtn() {
+    locBtn.style.bottom = (sheetEl.offsetHeight + 12) + 'px';
+  }
+
+  var map = new kakao.maps.Map(mapEl, {
+    center: new kakao.maps.LatLng(startLat, startLng),
+    level: 5
+  });
+
+  // 반경 원. 지도를 움직이면 가운데를 따라온다 — 사장이 "이만큼 본다"를 눈으로 안다.
+  var circle = new kakao.maps.Circle({
+    center: map.getCenter(),
+    radius: radius,
+    strokeWeight: 2,
+    strokeColor: '#0E8E6D',
+    strokeOpacity: 0.85,
+    fillColor: '#0E8E6D',
+    fillOpacity: 0.10
+  });
+  circle.setMap(map);
+
+  function setRadius(r) {
+    radius = r;
+    circle.setRadius(r);
+    chipEl.textContent = r >= 1000 ? ('반경 ' + (r / 1000) + 'km') : ('반경 ' + r + 'm');
+    fitToCircle();
+  }
+
+  /** 반경 원이 화면에 꽉 차지 않게 지도 배율을 맞춘다. */
+  function fitToCircle() {
+    var bounds = circle.getBounds();
+    if (bounds) map.setBounds(bounds, 40, 40, sheetEl.offsetHeight + 40, 40);
+  }
+
+  var geocoder = new kakao.maps.services.Geocoder();
+  var addrTimer = null;
+  var current = { lat: startLat, lng: startLng, address: '' };
+
+  function updateAddress() {
+    var c = map.getCenter();
+    current.lat = c.getLat();
+    current.lng = c.getLng();
+    circle.setPosition(c);
+
+    geocoder.coord2Address(c.getLng(), c.getLat(), function (result, status) {
+      if (status !== kakao.maps.services.Status.OK || !result[0]) {
+        // 바다·산 등 주소가 없는 곳. 좌표는 유효하니 조회는 되게 둔다.
+        addrEl.textContent = '주소를 찾을 수 없는 위치';
+        addrSubEl.textContent = c.getLat().toFixed(5) + ', ' + c.getLng().toFixed(5);
+        current.address = '';
+        confirmEl.disabled = false;
+        return;
+      }
+      var road = result[0].road_address;
+      var jibun = result[0].address;
+      var main = road ? road.address_name : (jibun ? jibun.address_name : '');
+      var sub = road && jibun ? jibun.address_name : '지도를 움직여 위치를 정하세요';
+      addrEl.textContent = main || '주소 없음';
+      addrSubEl.textContent = sub;
+      current.address = main || '';
+      confirmEl.disabled = false;
+    });
+  }
+
+  kakao.maps.event.addListener(map, 'dragstart', function () {
+    pinEl.classList.add('lift');
+    confirmEl.disabled = true;
+    addrSubEl.textContent = '위치를 정하는 중…';
+  });
+
+  function onIdle() {
+    pinEl.classList.remove('lift');
+    if (addrTimer) clearTimeout(addrTimer);
+    // 손을 뗀 직후 연속 호출되는 걸 막는다(카카오 지오코딩 호출 아끼기).
+    addrTimer = setTimeout(updateAddress, 180);
+  }
+  kakao.maps.event.addListener(map, 'idle', onIdle);
+
+  confirmEl.addEventListener('click', function () {
+    post({ type: 'select', lat: current.lat, lng: current.lng, address: current.address, radius: radius });
+  });
+
+  locBtn.addEventListener('click', function () {
+    // 위치 권한은 앱(React Native) 쪽이 갖고 있다. 웹에서 직접 묻지 않고
+    // 앱에 요청해서 좌표를 받아온다 — 권한 창이 두 번 뜨는 걸 막는다.
+    post({ type: 'requestMyLocation' });
+  });
+
+  function post(msg) {
+    if (window.ReactNativeWebView) {
+      window.ReactNativeWebView.postMessage(JSON.stringify(msg));
+    }
+  }
+
+  /** 앱 → 웹 메시지. 내 위치 좌표, 반경 변경을 받는다. */
+  function handleFromApp(raw) {
+    var msg;
+    try { msg = JSON.parse(raw); } catch (e) { return; }
+    if (msg.type === 'setCenter' && isFinite(msg.lat) && isFinite(msg.lng)) {
+      map.setCenter(new kakao.maps.LatLng(msg.lat, msg.lng));
+      if (msg.radius) setRadius(msg.radius);
+      else fitToCircle();
+    } else if (msg.type === 'setRadius' && msg.radius) {
+      setRadius(msg.radius);
+    }
+  }
+  // 안드로이드는 document, iOS는 window로 온다 — 둘 다 걸어둔다.
+  document.addEventListener('message', function (e) { handleFromApp(e.data); });
+  window.addEventListener('message', function (e) { handleFromApp(e.data); });
+
+  window.addEventListener('resize', function () { placeLocBtn(); });
+
+  placeLocBtn();
+  setRadius(radius);
+  updateAddress();
+  post({ type: 'ready' });
+})();
+</script>
+</body>
+</html>
