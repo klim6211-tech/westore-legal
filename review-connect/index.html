@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>네이버 계정 연동 - 위스토어</title>
+<style>
+  /* 값은 전부 lib/theme.ts 실측. 새 색을 지어내지 않는다. */
+  :root{
+    --brand:#12B886; --brandDark:#0E7A5C; --brandSoft:#E3F9F1;
+    --bg:#F2F4F6; --surface:#FFFFFF; --surfaceAlt:#F1F4F6; --border:#E5E8EB;
+    --textStrong:#191F28; --textBody:#4E5968; --textMuted:#6B7684;
+    --danger:#E03131; --dangerSoft:#FEECEC; --naver:#03C75A;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  html,body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;color:var(--textStrong);}
+  .wrap{max-width:420px;margin:0 auto;padding:28px 20px 40px;min-height:100vh;}
+  .logo{width:52px;height:52px;border-radius:16px;background:var(--naver);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;margin-bottom:18px;}
+  h1{font-size:20px;font-weight:700;line-height:28px;letter-spacing:-0.4px;color:var(--textStrong);margin-bottom:6px;}
+  .sub{font-size:14px;color:var(--textMuted);margin-bottom:26px;line-height:20px;}
+  .field{margin-bottom:16px;}
+  .fLabel{font-size:12.5px;font-weight:600;color:var(--textBody);margin-bottom:7px;}
+  input[type=text],input[type=password]{width:100%;height:50px;border-radius:12px;
+    border:1px solid var(--border);background:var(--surface);padding:0 14px;font-size:15px;
+    color:var(--textStrong);outline:none;-webkit-appearance:none;}
+  input:focus{border-color:var(--brand);}
+  .notice{background:var(--surfaceAlt);border-radius:12px;padding:14px;margin-top:6px;font-size:12.5px;
+    color:var(--textBody);line-height:18px;}
+  .notice b{color:var(--textStrong);}
+  .term{display:flex;gap:9px;align-items:flex-start;margin-top:18px;font-size:12.5px;color:var(--textBody);line-height:18px;}
+  .term input{width:16px;height:16px;margin-top:1px;accent-color:var(--brand);flex:none;}
+  .prime{width:100%;height:52px;border-radius:14px;background:var(--brandDark);color:#fff;border:none;
+    font-size:15px;font-weight:700;margin-top:22px;}
+  .prime:disabled{background:var(--border);color:var(--textMuted);}
+  .capT{text-align:center;margin-top:14px;font-size:12px;color:var(--textMuted);line-height:18px;}
+  .err{background:var(--dangerSoft);border:1px solid var(--danger);border-radius:12px;padding:14px;
+    font-size:13px;color:var(--danger);margin-top:14px;line-height:19px;font-weight:600;}
+  .center{text-align:center;padding-top:80px;}
+  .spinner{width:28px;height:28px;border-radius:50%;border:3px solid var(--border);
+    border-top-color:var(--brandDark);margin:0 auto 18px;animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .hidden{display:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="loading" class="center">
+    <div class="spinner"></div>
+    <div class="sub">확인하는 중…</div>
+  </div>
+
+  <div id="expired" class="center hidden">
+    <h1>연동 링크가 만료됐어요</h1>
+    <div class="sub">위스토어 앱에서 리뷰 관리 &gt; 연동하기를 다시 눌러주세요.</div>
+  </div>
+
+  <div id="formArea" class="hidden">
+    <div class="logo">N</div>
+    <h1>네이버 플레이스 리뷰를<br>관리하려면 로그인이 필요해요</h1>
+    <div class="sub">위스토어 앱이 아니라 이 페이지에서만 입력받습니다.</div>
+    <div id="errBox"></div>
+    <form id="f">
+      <div class="field">
+        <div class="fLabel">네이버 아이디</div>
+        <input type="text" name="naverId" autocomplete="username" required />
+      </div>
+      <div class="field">
+        <div class="fLabel">비밀번호</div>
+        <input type="password" name="naverPassword" autocomplete="current-password" required />
+      </div>
+      <div class="notice">
+        <b>2단계 인증이 설정된 네이버 계정만 연동이 가능합니다.</b><br>
+        연동 후 2단계 인증이 해제되면 답글 등록이 되지 않습니다.
+      </div>
+      <label class="term">
+        <input type="checkbox" id="agree" required />
+        <span>계정 정보는 암호화되어 안전하게 보관되며, 리뷰 조회·답글 등록 목적으로만
+        사용됩니다. 위 내용에 동의합니다.</span>
+      </label>
+      <button class="prime" type="submit" id="submitBtn">로그인하고 연동하기</button>
+      <div class="capT">이 창은 위스토어 앱이 아니라 위스토어의 연동 전용 페이지입니다.</div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function () {
+  var API = 'https://mhbpqddbldelqcsbafbn.supabase.co/functions/v1/review-connect';
+  var DEEP_LINK = 'westore://review-connect-callback';
+  var params = new URLSearchParams(location.search);
+  var t = params.get('t');
+
+  var $loading = document.getElementById('loading');
+  var $expired = document.getElementById('expired');
+  var $formArea = document.getElementById('formArea');
+  var $errBox = document.getElementById('errBox');
+  var $f = document.getElementById('f');
+  var $btn = document.getElementById('submitBtn');
+
+  function show(el) {
+    [$loading, $expired, $formArea].forEach(function (e) { e.classList.add('hidden'); });
+    el.classList.remove('hidden');
+  }
+
+  if (!t) {
+    show($expired);
+    return;
+  }
+
+  fetch(API + '?t=' + encodeURIComponent(t))
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.valid) show($formArea); else show($expired);
+    })
+    .catch(function () { show($expired); });
+
+  $f.addEventListener('submit', function (e) {
+    e.preventDefault();
+    $btn.disabled = true;
+    $btn.textContent = '연동하는 중…';
+    $errBox.innerHTML = '';
+
+    var parts = t.split('.');
+    var accountId = parts[0];
+    var token = parts.slice(1).join('.');
+
+    fetch(API, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        accountId: accountId,
+        token: token,
+        naverId: $f.naverId.value.trim(),
+        naverPassword: $f.naverPassword.value,
+      }),
+    })
+      .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+      .then(function (result) {
+        if (!result.ok) throw new Error(result.data.error || '연동에 실패했습니다.');
+        location.href = DEEP_LINK + '?status=verifying';
+      })
+      .catch(function (err) {
+        $btn.disabled = false;
+        $btn.textContent = '로그인하고 연동하기';
+        $errBox.innerHTML = '<div class="err">' + (err.message || '연동에 실패했습니다. 다시 시도해 주세요.') + '</div>';
+      });
+  });
+})();
+</script>
+</body>
+</html>
